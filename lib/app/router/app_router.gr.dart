@@ -29,6 +29,9 @@ class ArticleDetailRoute extends _i3.PageRouteInfo<ArticleDetailRouteArgs> {
     required _i5.Article article,
     DateTime Function()? clock,
     _i6.Future<void> Function(_i5.Article)? onOpenOnPhone,
+    bool initiallySaved = false,
+    _i6.Future<void> Function(_i5.Article)? onToggleSave,
+    _i6.Future<bool> Function(String)? isArticleSaved,
     List<_i3.PageRouteInfo>? children,
   }) : super(
          ArticleDetailRoute.name,
@@ -37,6 +40,9 @@ class ArticleDetailRoute extends _i3.PageRouteInfo<ArticleDetailRouteArgs> {
            article: article,
            clock: clock,
            onOpenOnPhone: onOpenOnPhone,
+           initiallySaved: initiallySaved,
+           onToggleSave: onToggleSave,
+           isArticleSaved: isArticleSaved,
          ),
          initialChildren: children,
        );
@@ -52,6 +58,9 @@ class ArticleDetailRoute extends _i3.PageRouteInfo<ArticleDetailRouteArgs> {
         article: args.article,
         clock: args.clock,
         onOpenOnPhone: args.onOpenOnPhone,
+        initiallySaved: args.initiallySaved,
+        onToggleSave: args.onToggleSave,
+        isArticleSaved: args.isArticleSaved,
       );
     },
   );
@@ -63,6 +72,9 @@ class ArticleDetailRouteArgs {
     required this.article,
     this.clock,
     this.onOpenOnPhone,
+    this.initiallySaved = false,
+    this.onToggleSave,
+    this.isArticleSaved,
   });
 
   final _i4.Key? key;
@@ -73,20 +85,28 @@ class ArticleDetailRouteArgs {
 
   final _i6.Future<void> Function(_i5.Article)? onOpenOnPhone;
 
+  final bool initiallySaved;
+
+  final _i6.Future<void> Function(_i5.Article)? onToggleSave;
+
+  final _i6.Future<bool> Function(String)? isArticleSaved;
+
   @override
   String toString() {
-    return 'ArticleDetailRouteArgs{key: $key, article: $article, clock: $clock, onOpenOnPhone: $onOpenOnPhone}';
+    return 'ArticleDetailRouteArgs{key: $key, article: $article, clock: $clock, onOpenOnPhone: $onOpenOnPhone, initiallySaved: $initiallySaved, onToggleSave: $onToggleSave, isArticleSaved: $isArticleSaved}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! ArticleDetailRouteArgs) return false;
-    return key == other.key && article == other.article;
+    return key == other.key &&
+        article == other.article &&
+        initiallySaved == other.initiallySaved;
   }
 
   @override
-  int get hashCode => key.hashCode ^ article.hashCode;
+  int get hashCode => key.hashCode ^ article.hashCode ^ initiallySaved.hashCode;
 }
 
 /// generated route for

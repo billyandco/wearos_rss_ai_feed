@@ -5,13 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:wearos_rss_ai_feed/core/di/injection.dart';
 import 'package:wearos_rss_ai_feed/features/feed/data/datasources/article_local_data_source.dart';
+import 'package:wearos_rss_ai_feed/features/feed/data/datasources/saved_article_local_data_source.dart';
 import 'package:wearos_rss_ai_feed/features/feed/data/feed_sources.dart';
 import 'package:wearos_rss_ai_feed/features/feed/data/repositories/article_repository_impl.dart';
+import 'package:wearos_rss_ai_feed/features/feed/data/repositories/saved_article_repository_impl.dart';
 import 'package:wearos_rss_ai_feed/features/feed/domain/repositories/article_repository.dart';
 import 'package:wearos_rss_ai_feed/features/feed/domain/repositories/remote_article_opener.dart';
+import 'package:wearos_rss_ai_feed/features/feed/domain/repositories/saved_article_repository.dart';
+import 'package:wearos_rss_ai_feed/features/feed/domain/usecases/is_article_saved.dart';
+import 'package:wearos_rss_ai_feed/features/feed/domain/usecases/load_saved_articles.dart';
 import 'package:wearos_rss_ai_feed/features/feed/domain/usecases/refresh_today_articles.dart';
+import 'package:wearos_rss_ai_feed/features/feed/domain/usecases/remove_saved_article.dart';
+import 'package:wearos_rss_ai_feed/features/feed/domain/usecases/toggle_saved_article.dart';
 import 'package:wearos_rss_ai_feed/features/feed/presentation/bloc/feed_bloc.dart';
 
+import '../../support/article_factory.dart';
 import '../../support/fake_http_adapter.dart';
 import '../../support/feed_test_doubles.dart';
 import '../../support/feed_xml_builder.dart';
@@ -37,7 +45,7 @@ void main() {
     }
   });
 
-  test('wires the graph and refreshes all seven sources through it', () async {
+  test('wires the graph and refreshes all eight sources through it', () async {
     final now = DateTime.now();
     final adapter = FakeHttpClientAdapter(
       (_) => xmlResponse(
@@ -81,5 +89,40 @@ void main() {
     await configureDependencies(cacheBox: box, dio: Dio());
 
     expect(sl<FeedBloc>(), isA<FeedBloc>());
+  });
+
+  test('wires the saved-article store on the same Hive box', () async {
+    await configureDependencies(cacheBox: box, dio: Dio());
+
+    expect(sl<SavedArticleRepository>(), isA<SavedArticleRepositoryImpl>());
+
+    final bookmarked = article(
+      guid: 'saved-through-di',
+      title: 'Saved through DI',
+    );
+
+    expect(await sl<ToggleSavedArticle>()(bookmarked), isTrue);
+
+    final savedRaw = box.get(HiveSavedArticleLocalDataSource.savedArticlesKey);
+    expect(savedRaw, isNotNull);
+    expect(savedRaw, contains('Saved through DI'));
+    // Saving must never spill into the today cache: that key is disposable and
+    // would otherwise resurrect a stale feed.
+    expect(box.get(HiveArticleLocalDataSource.articlesKey), isNull);
+
+    expect((await sl<LoadSavedArticles>()()).map((saved) => saved.identity), [
+      'saved-through-di',
+    ]);
+    expect(await sl<IsArticleSaved>()('saved-through-di'), isTrue);
+
+    expect(await sl<ToggleSavedArticle>()(bookmarked), isFalse);
+    expect(
+      box.get(HiveSavedArticleLocalDataSource.savedArticlesKey),
+      isNot(contains('Saved through DI')),
+    );
+    expect(await sl<IsArticleSaved>()('saved-through-di'), isFalse);
+
+    await sl<RemoveSavedArticle>()('saved-through-di');
+    expect(await sl<LoadSavedArticles>()(), isEmpty);
   });
 }

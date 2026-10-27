@@ -21,3 +21,28 @@ final class FeedArticleOpened extends FeedEvent {
 
   final Article article;
 }
+
+/// The user switched between today's feed and the saved list.
+final class FeedSectionToggled extends FeedEvent {
+  const FeedSectionToggled();
+}
+
+/// The saved list should be re-read (for example after returning from the
+/// detail page).
+final class FeedSavedReloadRequested extends FeedEvent {
+  const FeedSavedReloadRequested();
+}
+
+/// The user un-bookmarked [article] from the saved list.
+final class FeedSavedArticleRemoved extends FeedEvent {
+  const FeedSavedArticleRemoved(this.article);
+
+  final Article article;
+}
+
+/// The user pressed UNDO after un-bookmarking [article].
+final class FeedSavedArticleRestored extends FeedEvent {
+  const FeedSavedArticleRestored(this.article);
+
+  final Article article;
+}

@@ -21,4 +21,5 @@ const List<FeedSource> kFeedSources = <FeedSource>[
     url: 'https://www.technologyreview.com/topic/artificial-intelligence/feed/',
   ),
   FeedSource(name: 'Ars Technica AI', url: 'https://arstechnica.com/ai/feed/'),
+  FeedSource(name: 'Hacker News', url: 'https://hnrss.org/frontpage'),
 ];

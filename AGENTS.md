@@ -1,9 +1,22 @@
 # AGENTS.md — working guide for this repo
 
 AI Today: a single-screen Flutter RSS reader for the Pixel Watch 1 (round
-450 × 450). Merges 7 AI news feeds into a today-only list capped at 20, cached
-in Hive; tap opens a detail page, double-tap sends the link to the paired
-phone. See `README.md` for the full picture.
+panel; **192 dp** logical at dpr 2). Merges 8 AI news feeds into a today-only
+list capped at 20, cached in Hive, plus a local saved-articles store; tap opens
+a detail page, double-tap sends the link to the paired phone, and tapping the
+`TODAY` pill switches the list to `SAVED`. See `README.md` for the full picture.
+
+## Canvas facts (do not mix these up)
+
+| Context | Logical size | Why |
+| --- | --- | --- |
+| Real watch | **192 dp** (dpr 2 → 384 px framebuffer) | `screencap` returns 384×384; the detail page's `0.06·d` insets measure 11.5 dp there |
+| Interaction/widget tests | 450 dp (`physicalSize 450²`, dpr 1) | fast, tap-target-friendly; **does not** reproduce round-chord clipping |
+| Golden tests | **192 dp** (384² @ dpr 2) | the design acceptance artifact — must match the device |
+
+A layout can pass at 450 dp and overflow at 192 dp (it already happened: the
+saved empty state overflowed by 8 dp and its title sat under the pill). Any new
+screen must get a 192 dp golden.
 
 ## Toolchain
 
@@ -15,20 +28,29 @@ phone. See `README.md` for the full picture.
 
 ## Before you finish
 
-1. `fvm flutter test` — all 130 must pass. **Never edit a test to make it
-   pass**; a red test is a contract — report it and stop.
+1. `fvm flutter test` — all **240** must pass. **Never edit a test to make it
+   pass**; a red test is a contract — report it and stop. The 8 golden
+   comparisons are part of that count.
 2. `fvm flutter analyze` — must be clean.
 3. `fvm dart format --set-exit-if-changed lib test` — must report 0 changed.
-4. Update `README.md` if you changed behaviour: feature list, round-screen
+4. If you changed a screen, regenerate the goldens
+   (`fvm flutter test test/goldens --update-goldens`), re-run them **without**
+   the flag twice to prove determinism, and say which PNGs changed and why.
+   Goldens need the SDK's `material_fonts` artifact
+   (`$FLUTTER_ROOT/bin/cache/artifacts/material_fonts/`); `test/goldens/golden_fonts.dart`
+   resolves it via `FLUTTER_ROOT` or the `dart` executable path.
+5. Update `README.md` if you changed behaviour: feature list, round-screen
    numbers, test count, verification status.
 
 ## Architecture (short)
 
-`FeedView → FeedBloc → use cases → ArticleRepository (domain)`; data layer
-implements it with Dio / Hive / MethodChannel. Domain imports no Flutter.
-`app_router.gr.dart` is committed — regenerate with build_runner after touching
-routes. DI lives in one `get_it` container (`sl`); tests use fakes in
-`test/support/`, injectable clocks, and a 450 × 450 `tester.view`.
+`FeedView → FeedBloc → use cases → ArticleRepository / SavedArticleRepository
+(domain)`; the data layer implements them with Dio / Hive / MethodChannel.
+Domain imports no Flutter. `app_router.gr.dart` is committed — regenerate with
+build_runner after touching routes (adding a route arg counts). DI lives in one
+`get_it` container (`sl`); tests use fakes in `test/support/`, injectable
+clocks, and the canvas noted above. The saved store is a second Hive key
+(`saved_articles`) in the **same** box as the feed cache (`today_articles`).
 
 ## Conventions
 
@@ -68,6 +90,34 @@ routes. DI lives in one `get_it` container (`sl`); tests use fakes in
 10. `adb` hygiene: mDNS entries go stale and pairing ports rotate — re-pair
     when refused; `uiautomator dump` returns empty text under Flutter; revert
     `stayon` / `screen_off_timeout` after testing.
+11. Saved articles are a second key (`saved_articles`) in the **same** Hive box.
+    Never `box.clear()` and never write the other key: both directions are
+    pinned by tests, and clobbering `today_articles` would wipe the feed.
+12. TODAY and SAVED must never be in the widget tree at the same time — both
+    lists use `article-hero-${identity}` and a duplicate tag crashes any push.
+    `_FeedBody` switches between them; do not "optimise" this into an
+    `IndexedStack`/`PageView`.
+13. A section switch must reset both the header and the scroll position: the
+    lists carry different keys (`feed-list` / `saved-list`), and
+    `_resetHeader()` clears `_lastPixels` — without it the header sticks faded
+    and the next scroll delta jumps.
+14. In SAVED the header is **pinned** (it is the only mode indicator and the
+    only way back) and sits on a full-width 45 dp black scrim; without the scrim
+    a scrolled row is sliced by the pill's corner arc and leaves a glyph speck
+    above it. TODAY keeps fade-on-scroll.
+15. `SnackBarAction` resolves to `colorScheme.inversePrimary` (`#6750A4`,
+    **2.87:1** on `kWearSurface`) unless the theme overrides
+    `actionTextColor` — it does (`kWearAccent`, 12.3:1). Floating snackbars also
+    need the `insetPadding` bottom (52 dp) or their corners fall outside the
+    circle's chord.
+16. Golden tests only mean something with real fonts: without loading
+    `material_fonts` every glyph renders as a box. Register Roboto +
+    MaterialIcons for the golden file only (a global `flutter_test_config.dart`
+    would change text metrics for all 232 interaction tests).
+17. `InkWell` with `onTap` + `onDoubleTap` + `onLongPress` works, but only the
+    saved rows pass `onLongPress`; TODAY rows must keep exactly two gestures.
+    Saved rows also carry their own semantics hint, since a long-press has no
+    visual affordance.
 
 ## Device cheat sheet
 

@@ -146,7 +146,7 @@ void main() {
 
   // --- Feed cap -----------------------------------------------------------
   // The merged feed must never show more than the 20 newest articles, even
-  // though 7 sources can publish far more than that on a busy day.
+  // though 8 sources can publish far more than that on a busy day.
 
   test('caps the merged list at the 20 newest articles', () {
     // Literal guard: a constant that drifts away from 20 must fail loudly.

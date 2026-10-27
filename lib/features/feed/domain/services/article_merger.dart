@@ -2,7 +2,7 @@ import '../entities/article.dart';
 
 /// Maximum number of articles in the merged feed.
 ///
-/// Bounds both the watch list and the Hive cache: 7 sources can publish far
+/// Bounds both the watch list and the Hive cache: 8 sources can publish far
 /// more than this on a busy day, and only the newest entries are worth keeping
 /// on a watch.
 const int kMaxFeedArticles = 20;

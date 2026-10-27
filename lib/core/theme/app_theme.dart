@@ -50,6 +50,11 @@ ThemeData buildWearTheme() {
       backgroundColor: kWearSurface,
       contentTextStyle: TextStyle(color: Colors.white, fontSize: 13),
       behavior: SnackBarBehavior.floating,
+      // M3's default (inversePrimary, #6750A4) is only 2.87:1 on kWearSurface.
+      actionTextColor: kWearAccent,
+      // A floating bar at the bottom edge of a round display would have its
+      // corners clipped by the circle's chord without this inset.
+      insetPadding: EdgeInsets.fromLTRB(20, 5, 20, 52),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(foregroundColor: kWearAccent),

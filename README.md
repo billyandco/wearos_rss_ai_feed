@@ -1,8 +1,10 @@
 # AI Today — a Wear OS RSS reader
 
-A Flutter app for the **Pixel Watch 1** (450 × 450 round, 1.2") that merges
-seven AI news feeds into one today-only list. Tap an article to read it in full
-on the watch; double-tap it to open it in the browser of the paired phone.
+A Flutter app for the **Pixel Watch 1** (1.2" round panel; Wear OS exposes a
+**192 dp** logical canvas at dpr 2, i.e. a 384 px framebuffer — verified with
+`screencap`) that merges eight AI news feeds into one today-only list, plus a
+local **saved articles** list. Tap an article to read it in full on the watch;
+double-tap it to open it in the browser of the paired phone.
 
 Built with a strict Clean Architecture split, BLoC, get_it, auto_route, dio,
 hive_ce and `package:xml`, using **fvm / Flutter 3.47.7**.
@@ -10,8 +12,8 @@ hive_ce and `package:xml`, using **fvm / Flutter 3.47.7**.
 ## Features
 
 - **One merged list, newest first** across The Decoder, TechCrunch AI, OpenAI
-  News, Hugging Face Blog, Interconnects, MIT Tech Review AI and Ars Technica
-  AI — capped at the **20 newest** (`kMaxFeedArticles`).
+  News, Hugging Face Blog, Interconnects, MIT Tech Review AI, Ars Technica
+  AI and Hacker News — capped at the **20 newest** (`kMaxFeedArticles`).
 - **Today only**: at fetch time, items outside the device-local calendar day are
   dropped — in the parser isolate, before they reach the UI or the cache.
 - **Deduplicated** by guid, falling back to link, keeping the newest copy.
@@ -21,6 +23,12 @@ hive_ce and `package:xml`, using **fvm / Flutter 3.47.7**.
   (`ACTION_VIEW` + `CATEGORY_BROWSABLE`), with a snackbar when the phone cannot
   be reached. Rows use an `InkWell`, so the press ripple appears on tap-down
   instead of after the double-tap window.
+- **Saved articles**: tap the header pill to flip between **TODAY** and
+  **SAVED**. The saved list is newest-published-first, ignores the "today" rule
+  and the 20-item cap, and lives in its own Hive key, so it survives refreshes,
+  restarts and midnight. The detail page carries a `Save article` / `Saved`
+  toggle under "Open on phone"; long-press a saved row to remove it, undoable
+  for 4 s. A broken saved store fails on its own and never blanks today's feed.
 - **Round-screen UI**: flat `ListView.builder` feed with fixed 116 dp rows,
   true black OLED background, two-line title and summary.
 - **Offline-friendly**: last successful fetch is cached in Hive and shown
@@ -31,7 +39,7 @@ hive_ce and `package:xml`, using **fvm / Flutter 3.47.7**.
 ## Feed sources
 
 The list is curated and hardcoded (`lib/features/feed/data/feed_sources.dart`
-— no source-management UI by design). All seven are fetched in parallel on
+— no source-management UI by design). All eight are fetched in parallel on
 every refresh:
 
 | Source | Feed URL |
@@ -43,6 +51,7 @@ every refresh:
 | Interconnects | `https://www.interconnects.ai/feed` |
 | MIT Tech Review AI | `https://www.technologyreview.com/topic/artificial-intelligence/feed/` |
 | Ars Technica AI | `https://arstechnica.com/ai/feed/` |
+| Hacker News | `https://hnrss.org/frontpage` |
 
 ## Stack
 
@@ -86,7 +95,7 @@ lib/
     │   ├── models/                # ArticleModel JSON DTO
     │   ├── services/              # RSS parser + isolate, RFC 822 date parser
     │   ├── repositories/          # ArticleRepositoryImpl
-    │   └── feed_sources.dart      # const kFeedSources (7 feeds)
+    │   └── feed_sources.dart      # const kFeedSources (8 feeds)
     └── presentation/
         ├── bloc/                  # FeedBloc / FeedEvent / FeedState
         ├── pages/
@@ -112,7 +121,7 @@ without mocks of those packages.
 2. Bloc emits `loading`, reads the Hive cache and shows it immediately if present
    (no re-filtering: cached results are returned as-is).
 3. Bloc dispatches `FeedRefreshRequested`. The repository asks the remote source
-   for all seven feeds **in parallel** (15 s connect / 90 s read timeouts).
+   for all eight feeds **in parallel** (15 s connect / 90 s read timeouts).
 4. Each feed is parsed by `parseFeedXml` inside `compute()` — OpenAI (~1,300
    items) and Hugging Face (~900 items) never block the UI isolate. The parser
    keeps only items on the current local day, normalizes dates to local time,
@@ -135,19 +144,33 @@ articles are used. A failed refresh leaves the previous cache untouched.
 - The feed is a flat `ListView.builder` with a fixed 116 dp row extent, so rows
   sit straight and scroll 1:1 with the finger.
 - Each row keeps an 8 dp horizontal gutter so it never touches the display edge.
-- Fixed 116 dp row height gives ~2.9 visible articles and a large touch target.
-- The header (`TODAY` plus a one-line inline error strip) is overlaid on the top
-  of the circle: an opaque black pill, so rows scrolling underneath never show
-  through the text. The list starts below it (`48 dp`, or `72 dp` while the
-  inline error is shown), so row 0 is never hidden. The header animates out when
-  you scroll down, back in when you scroll up, and is always visible at the top
-  of the list.
-- Refresh is pull-to-refresh (`RefreshIndicator`) over the feed; the empty state
-  keeps its own button because there is no list to pull.
+- Fixed 116 dp row height gives ~1.5 rows at rest on the 192 dp canvas (the row
+  itself is 110 dp: 116 minus the 6 dp gap) and a large touch target.
+- The header is the section switch: `TODAY` ↔ `SAVED`, plain text inside an
+  opaque black pill (rows scrolling underneath never show through). The pill is
+  23 dp tall but sits in a **45 dp tap band** anchored at the top edge, so the
+  only doorway to the saved list is a real touch target at 192 dp. The list
+  starts below it (`48 dp`, or `72 dp` while the inline error is shown), so row
+  0 is never hidden.
+- In **TODAY** the header animates out when you scroll down and back in when you
+  scroll up. In **SAVED** it stays pinned: it is simultaneously the mode
+  indicator and the only way back, so hiding it would strand the user. A
+  full-width 45 dp black scrim sits behind it in SAVED, so a scrolled row is cut
+  on one horizontal line instead of around the pill's corner arc.
+- The saved section has no pull-to-refresh (there is nothing to fetch) and no
+  inline error strip; a failed read shows its own copy in the empty slot rather
+  than claiming "No saved articles yet". Long-press removes a row
+  (`HapticFeedback.mediumImpact`) and shows a one-line `Removed` / `UNDO`
+  snackbar, kept clear of the circle's chord by a 52 dp bottom inset.
+- Refresh is pull-to-refresh (`RefreshIndicator`) over the today feed; the empty
+  state keeps its own button because there is no list to pull.
 - No status/navigation bar chrome; black window background from launch.
-- The detail page is one scroll view (button travels with the content) with
-  size-relative insets (6% sides, 5% top, 30% trailing space after the button),
-  so the button can be scrolled up into the wide middle band of the circle.
+- The detail page is one scroll view (buttons travel with the content) with
+  size-relative insets (6% sides, 5% top, 30% trailing space after the buttons),
+  so the pair can be scrolled up into the wide middle band of the circle.
+  `Open on phone` and `Save article` are both 44 dp tall, 8 dp apart, identical
+  width; the save control is a `TextButton` in accent (not a second filled
+  button) whose bookmark glyph flips outline → filled.
 - Page transitions are an explicit black fade on every platform
   (`FadeForwardsPageTransitionsBuilder(backgroundColor: kWearBackground)`):
   Android's default zoom transition snapshots the entering route and flashes
@@ -214,14 +237,23 @@ unit tests in the same step. Suites are organised by layer:
 | --- | --- |
 | `test/features/feed/domain` | Entity identity/equality and local-day checks; merge filter, dedupe, sort, tie-break, invalid items, 20-newest cap (after dedupe, tie-break respected); use-case delegation and URL validation |
 | `test/features/feed/data` | RFC 822/ISO dates (GMT, numeric offsets, named zones, two-digit years), parser normalization (CDATA, HTML, `content:encoded`, missing description/author, guid fallback), isolate parsing, 400-char cap, `FeedRemoteDataSource` partial/all failure, Hive round-trip and corrupt-cache recovery, repository cache/no-overwrite failure rules, MethodChannel opener |
-| `test/features/feed/presentation` | BLoC cached-first/refresh/failure/notice/one-refresh-at-a-time behaviour; widget rendering of source, relative time, title, null description, tap→detail navigation, double-tap→phone, retry and empty states at 450 × 450; the detail page (full description, hero tag, open-on-phone success/failure); header fade out on scroll-down / back on scroll-up / reset when the list is replaced; pull-to-refresh via a real drag gesture |
-| `test/core` | Relative time; theme palette wiring and the black page-transition backdrop on all platforms; get_it graph wiring across all 7 sources |
+| `test/features/feed/presentation` | BLoC cached-first/refresh/failure/notice/one-refresh-at-a-time behaviour; saved section toggle, reload-after-detail, remove/restore, `savedErrorMessage` isolation; widget rendering of source, relative time, title, null description, tap→detail navigation, double-tap→phone, retry and empty states; the detail page (full description, hero tag, open-on-phone success/failure, save/unsave with the glyph flipping, 44 dp button geometry); header fade out on scroll-down / back on scroll-up in TODAY, pinned in SAVED, 44 dp tap band, label typography; saved list markers, empty/error slots, long-press removal + UNDO, scroll/header reset on section switch; pull-to-refresh via a real drag gesture |
+| `test/core` | Relative time; theme palette wiring, the black page-transition backdrop on all platforms, snackbar action contrast (`actionTextColor`) and the 52 dp bottom inset; get_it graph wiring across all 8 sources and the shared saved-store box |
 | `test/app` | Router registers the feed (initial) and detail routes |
+| `test/goldens` | `matchesGoldenFile` acceptance artifacts rendered at the **device canvas** (384 × 384 px, dpr 2.0 = 192 dp) with the SDK's real Roboto + MaterialIcons: today at rest, saved at rest, saved scrolled under the pinned header, saved empty, saved read failure, removal + UNDO snackbar, and the detail page's stacked buttons in both states |
 
 Supporting test utilities: fake `HttpClientAdapter`, RSS XML builder with
-timezone-independent dates, article factory, fake repository/opener, and
-MethodChannel mocking. Fixtures mirror real feed shapes (WordPress `+0000`
-dates, `dc:creator`, CDATA HTML, Hugging Face items with no description/author).
+timezone-independent dates, article factory, fake repository/opener/saved store,
+golden font loader (`test/goldens/golden_fonts.dart`, reads the SDK's
+`material_fonts` artifact), and MethodChannel mocking. Fixtures mirror real feed
+shapes (WordPress `+0000` dates, `dc:creator`, CDATA HTML, Hugging Face items
+with no description/author).
+
+Golden workflow: `fvm flutter test test/goldens --update-goldens` rewrites the
+PNGs; a plain run compares them byte-for-byte and fails on any layout drift.
+Goldens are the design acceptance artifact — they are captured at 192 dp, while
+the interaction tests still run on a 450 dp `tester.view` (see the geometry note
+in `AGENTS.md`).
 
 Deterministic-time strategy: use cases receive `now` from the bloc's injectable
 clock; the UI receives the same clock; the parser receives the fetch time.
@@ -230,7 +262,8 @@ clock; the UI receives the same clock; the parser receives the fetch time.
 
 Verified in this workspace with Flutter 3.47.7 / Dart 3.13.5:
 
-- `fvm flutter test` — **130 tests pass**.
+- `fvm flutter test` — **240 tests pass** (232 behaviour/widget + 8 golden
+  image comparisons).
 - `fvm flutter analyze` — **no issues**.
 - `fvm dart format` — clean.
 - `fvm flutter build apk --release --target-platform android-arm` —
@@ -245,6 +278,10 @@ Verified in this workspace with Flutter 3.47.7 / Dart 3.13.5:
   `android.hardware.type.watch` feature, portrait activity, `INTERNET`,
   `com.google.android.wearable.standalone=false`, and
   `androidx.wear:wear-remote-interactions:1.2.0` resolved by Gradle.
+- **Saved articles** — verified by widget tests and the 192 dp golden set, which
+  caught a real `RenderFlex` overflow and three ragged-line/occlusion defects
+  that the 450 dp tests could not see. Hardware re-verification of the new
+  header toggle, save button and UNDO bar is pending the next watch session.
 
 The APK requires an Android SDK with API 36 + build-tools 36 and JDK 21; unit
 and widget tests do not need the Android SDK.
@@ -259,6 +296,15 @@ and widget tests do not need the Android SDK.
   intentionally not re-filtered until the next successful fetch, per the
   requirement. On quiet days the list holds fewer than 20 articles by design
   (cap, not fill).
+- Saved articles are exempt from both rules above: they are never re-filtered by
+  day and never capped. The saved list grows without bound (a whole-list JSON
+  rewrite per toggle), which is fine at tens or hundreds of items and is the
+  point at which the store should be revisited.
+- The saved store lives under its own key (`saved_articles`) in the same Hive
+  box as the feed cache (`today_articles`); the two never overwrite each other.
+- The section switch is a plain text swap inside the pill, by explicit product
+  choice. It paints black-on-black, so nothing but the word itself signals that
+  it is tappable — a chevron was considered and deferred.
 - Descriptions are converted to plain text and capped at 400 characters; author
   is stored but not shown, to keep rows readable at 1.2".
 - The release APK is debug-signed for sideloading; a Play upload needs your own

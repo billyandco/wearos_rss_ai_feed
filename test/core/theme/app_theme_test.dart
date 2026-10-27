@@ -174,6 +174,32 @@ void main() {
       );
     });
 
+    test('snackBarTheme action text uses the accent color', () {
+      expect(
+        theme.snackBarTheme.actionTextColor,
+        kWearAccent,
+        reason:
+            'the M3 default inversePrimary (#6750A4) is only 2.87:1 on '
+            'kWearSurface, so the UNDO label would be unreadable',
+      );
+    });
+
+    test('the floating snack bar clears the round display chord', () {
+      final EdgeInsets? insets = theme.snackBarTheme.insetPadding;
+      expect(
+        insets,
+        isNotNull,
+        reason: 'a floating bar needs explicit insets on a round screen',
+      );
+      expect(
+        insets!.bottom,
+        greaterThanOrEqualTo(44),
+        reason:
+            'at the bottom edge the circle is only a chord, so the corners of '
+            'a floating bar would be clipped without a 44 dp inset',
+      );
+    });
+
     test('progressIndicatorTheme uses the accent color', () {
       expect(theme.progressIndicatorTheme.color, kWearAccent);
     });

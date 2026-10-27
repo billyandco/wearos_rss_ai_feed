@@ -16,7 +16,19 @@ class ArticleTile extends StatelessWidget {
     required this.now,
     required this.onOpenOnPhone,
     this.onTap,
+    this.onLongPress,
+    this.isSaved = false,
+    this.semanticsHint,
   });
+
+  /// The hint a plain row announces to a screen reader.
+  static const String defaultSemanticsHint =
+      'Tap to read, double tap to open on your phone';
+
+  /// The hint a saved row announces, where a long press removes it.
+  static const String savedSemanticsHint =
+      'Tap to read, double tap to open on your phone, '
+      'long press to remove from saved';
 
   final Article article;
   final DateTime now;
@@ -24,6 +36,15 @@ class ArticleTile extends StatelessWidget {
 
   /// Called on a single tap, once the double-tap window has elapsed.
   final VoidCallback? onTap;
+
+  /// Long press action, only wired for rows in the saved list.
+  final VoidCallback? onLongPress;
+
+  /// Shows the bookmark marker in the meta row (saved list only).
+  final bool isSaved;
+
+  /// Overrides the announced hint; defaults to [defaultSemanticsHint].
+  final String? semanticsHint;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +55,7 @@ class ArticleTile extends StatelessWidget {
     return Semantics(
       button: true,
       label: '${article.title}. ${article.sourceName}.',
-      hint: 'Tap to read, double tap to open on your phone',
+      hint: semanticsHint ?? defaultSemanticsHint,
       child: Padding(
         key: ValueKey<String>('article-row-${article.identity}'),
         padding: const EdgeInsets.symmetric(vertical: 3),
@@ -52,6 +73,7 @@ class ArticleTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 onTap: onTap,
                 onDoubleTap: onOpenOnPhone,
+                onLongPress: onLongPress,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -87,6 +109,17 @@ class ArticleTile extends StatelessWidget {
                             formatRelativeTime(article.publishedAt, now: now),
                             style: textTheme.labelSmall,
                           ),
+                          if (isSaved) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.bookmark_rounded,
+                              size: 14,
+                              color: Colors.white,
+                              key: Key(
+                                'article-saved-marker-${article.identity}',
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 2),

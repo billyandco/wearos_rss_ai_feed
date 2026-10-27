@@ -1,5 +1,12 @@
 import '../entities/article.dart';
 
+/// Maximum number of articles in the merged feed.
+///
+/// Bounds both the watch list and the Hive cache: 7 sources can publish far
+/// more than this on a busy day, and only the newest entries are worth keeping
+/// on a watch.
+const int kMaxFeedArticles = 20;
+
 /// Pure business rules for the merged, today-only reading list.
 ///
 /// Kept in the domain layer so the rules can be unit tested without Dio, Hive
@@ -8,11 +15,13 @@ class ArticleMerger {
   const ArticleMerger();
 
   /// Filters [articles] to the local calendar day of [now], removes duplicates
-  /// (by guid, falling back to link) and sorts newest first.
+  /// (by guid, falling back to link), sorts newest first and caps the result at
+  /// the [kMaxFeedArticles] newest entries.
   ///
   /// When two copies of the same article differ, the most recently published
   /// copy wins. Articles without a usable identity or title are dropped, since
-  /// they cannot be de-duplicated or rendered.
+  /// they cannot be de-duplicated or rendered. The cap is applied after
+  /// filtering, de-duplication and sorting, so it keeps the newest stories.
   List<Article> merge(Iterable<Article> articles, {required DateTime now}) {
     final byIdentity = <String, Article>{};
 
@@ -41,6 +50,6 @@ class ArticleMerger {
         return a.title.toLowerCase().compareTo(b.title.toLowerCase());
       });
 
-    return List<Article>.unmodifiable(merged);
+    return List<Article>.unmodifiable(merged.take(kMaxFeedArticles));
   }
 }

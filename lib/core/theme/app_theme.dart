@@ -57,5 +57,32 @@ ThemeData buildWearTheme() {
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: kWearAccent,
     ),
+    // An explicit transition for every platform keeps route pushes on a fade
+    // over the OLED-black backdrop instead of the platform default. Android's
+    // ZoomPageTransitionsBuilder snapshots the entering route, and that
+    // snapshot renders a blank (white) frame behind the hero flight on the
+    // watch. Fading over kWearBackground keeps every frame dark.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: <TargetPlatform, PageTransitionsBuilder>{
+        TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+        TargetPlatform.iOS: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+        TargetPlatform.macOS: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+        TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+        TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+        TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(
+          backgroundColor: kWearBackground,
+        ),
+      },
+    ),
   );
 }

@@ -272,7 +272,7 @@ void main() {
     );
   });
 
-  testWidgets('tapping Save bookmarks the article and confirms', (
+  testWidgets('tapping Save flips the button and shows no snackbar', (
     tester,
   ) async {
     final toggled = <Article>[];
@@ -289,10 +289,14 @@ void main() {
     await tester.tap(find.byKey(const Key('article-detail-save')));
     await tester.pump();
 
-    final confirmed = await pumpUntil(
+    final save = find.byKey(const Key('article-detail-save'));
+
+    // The button itself is the confirmation, so wait on the label rather than
+    // on a snackbar.
+    final flipped = await pumpUntil(
       tester,
       () => find
-          .descendant(of: find.byType(SnackBar), matching: find.text('Saved'))
+          .descendant(of: save, matching: find.text('Saved'))
           .evaluate()
           .isNotEmpty,
     );
@@ -300,15 +304,27 @@ void main() {
     expect(toggled.map((entry) => entry.guid).toList(), [
       'save-2',
     ], reason: 'the injected writer must receive the page article');
-    expect(confirmed, isTrue, reason: 'a successful save must be confirmed');
+    expect(flipped, isTrue, reason: 'the label must flip to the saved state');
+
+    // Past the ~250 ms snackbar entrance yet far short of its 3 s dwell, so a
+    // bar that appeared would still be on screen here.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.byType(SnackBar),
+      findsNothing,
+      reason:
+          'the label and glyph already flip in the same frame, so a snackbar '
+          'would only cover the middle of the 192 dp circle',
+    );
     expect(
       find.text('Saved'),
-      findsAtLeastNWidgets(1),
-      reason: 'the label must flip to the saved state',
+      findsOneWidget,
+      reason:
+          'the single "Saved" on screen must be the button label, never a '
+          'transient bar',
     );
     expect(find.text('Save article'), findsNothing);
-
-    final save = find.byKey(const Key('article-detail-save'));
     expect(
       find.descendant(of: save, matching: find.byIcon(Icons.bookmark_rounded)),
       findsOneWidget,
@@ -372,7 +388,7 @@ void main() {
     );
   });
 
-  testWidgets('tapping Saved unsaves the article and confirms the removal', (
+  testWidgets('tapping Saved flips the button back and shows no snackbar', (
     tester,
   ) async {
     final toggled = <Article>[];
@@ -397,7 +413,25 @@ void main() {
 
     expect(toggled.map((entry) => entry.guid).toList(), ['save-4']);
     expect(undone, isTrue, reason: 'the label must return to Save article');
-    expect(find.text('Removed from saved'), findsOneWidget);
+
+    // Same contract in the other direction: past the snackbar entrance, well
+    // before its 3 s dwell.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.byType(SnackBar),
+      findsNothing,
+      reason:
+          'unsaving is as silent as saving: the button flip is the whole '
+          'feedback, and a bar would cover the circle',
+    );
+    expect(
+      find.text('Removed from saved'),
+      findsNothing,
+      reason:
+          'the detail page never keeps a "Removed" bar; the feed owns its own '
+          'Removed / UNDO bar',
+    );
     expect(find.text('Saved'), findsNothing);
     expect(
       find.descendant(

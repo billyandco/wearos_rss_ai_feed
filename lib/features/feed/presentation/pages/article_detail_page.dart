@@ -130,8 +130,13 @@ class _ArticleDetailPageState extends State<ArticleDetailPage> {
       if (!mounted) {
         return;
       }
-      setState(() => _saved = saved);
-      _finish(saved ? 'Saved' : 'Removed from saved');
+      // Success is silent: the label and glyph flip on the same frame and are
+      // the whole confirmation. A bar would only cover the middle of the
+      // circle, which is the tightest space on a 192 dp round panel.
+      setState(() {
+        _saved = saved;
+        _saving = false;
+      });
     } catch (error) {
       _finish(_messageFor(error));
     }

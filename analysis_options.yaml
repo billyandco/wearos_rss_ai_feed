@@ -1,0 +1,28 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    invalid_annotation_target: ignore
+  exclude:
+    - build/**
+    - android/**
+
+linter:
+  rules:
+    # Constructors intentionally expose public parameter names while keeping
+    # their fields private.
+    prefer_initializing_formals: false
+    always_declare_return_types: true
+    avoid_dynamic_calls: true
+    avoid_print: true
+    directives_ordering: true
+    prefer_const_constructors: true
+    prefer_final_locals: true
+    prefer_single_quotes: true
+    sort_child_properties_last: true
+    unawaited_futures: true
+    use_super_parameters: true
